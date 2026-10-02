@@ -1,0 +1,7 @@
+out/
+.idea/workspace.xml
+.idea/shelf/
+*.class
+
+# copia local de seguridad (no se sube)
+_backup_original/
