@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Hilos visual</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  :root {
+    --azul: #2563eb; --azul-claro: #dbeafe; --nar: #ea580c; --nar-claro: #ffedd5;
+    --ok: #16a34a; --ok-claro: #dcfce7; --mal: #dc2626; --mal-claro: #fee2e2;
+    --verde: #059669; --verde-claro: #d1fae5; --amar: #ca8a04; --amar-claro: #fef9c3;
+    --tinta: #1e293b; --suave: #64748b; --linea: #cbd5e1; --fondo: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta); font-family: "Segoe UI", system-ui, sans-serif; }
+  .page { width: 297mm; height: 210mm; padding: 11mm 14mm 9mm; position: relative; page-break-after: always;
+          overflow: hidden; display: flex; flex-direction: column; }
+  .page:last-child { page-break-after: auto; }
+  .num { position: absolute; right: 14mm; bottom: 6mm; color: var(--suave); font-size: 10pt; }
+  .tag { position: absolute; left: 14mm; bottom: 6mm; color: var(--suave); font-size: 9pt; }
+  h1 { font-size: 23pt; margin: 0 0 2mm; }
+  h2 { font-size: 12.5pt; margin: 0 0 3mm; color: var(--suave); font-weight: 500; }
+  h3 { font-size: 12.5pt; margin: 2mm 0 1.5mm; }
+  .chip { display: inline-block; font-size: 9pt; font-weight: 700; padding: 1mm 3mm; border-radius: 99px;
+          margin-bottom: 2mm; background: var(--azul-claro); color: var(--azul); letter-spacing: .4px; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: "Segoe UI", system-ui, sans-serif; fill: var(--tinta); }
+  .mono, svg .mono { font-family: Consolas, "Cascadia Mono", monospace; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; align-items: start; }
+  .card { border: 1.5px solid var(--linea); border-radius: 3.5mm; padding: 3mm 4mm; font-size: 11pt; }
+  .card .ico { font-size: 20pt; display: block; }
+  .card b.t { display: block; font-size: 12.5pt; margin: 1mm 0; }
+  .azul { border-color: var(--azul); background: var(--azul-claro); }
+  .nar { border-color: var(--nar); background: var(--nar-claro); }
+  .ok { border-color: var(--ok); background: var(--ok-claro); }
+  .mal { border-color: var(--mal); background: var(--mal-claro); }
+  .verde { border-color: var(--verde); background: var(--verde-claro); }
+  .amar { border-color: var(--amar); background: var(--amar-claro); }
+  .frase { margin-top: auto; border-left: 5px solid var(--azul); background: #f1f5f9; padding: 3mm 5mm;
+           font-size: 12.5pt; border-radius: 0 3mm 3mm 0; }
+  pre { font-family: Consolas, monospace; font-size: 10pt; background: #0f172a; color: #e2e8f0; padding: 3mm 4mm;
+        border-radius: 3mm; margin: 0; line-height: 1.45; }
+  pre .c { color: #94a3b8; } pre .k { color: #f472b6; } pre .m { color: #fca5a5; } pre .g { color: #86efac; }
+  table { border-collapse: collapse; width: 100%; font-size: 11pt; }
+  th, td { border: 1px solid var(--linea); padding: 2mm 3mm; text-align: left; }
+  th { background: #f1f5f9; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================== 1 MAPA -->
+<section class="page">
+  <span class="chip">TEMA 1 · MAPA</span>
+  <h1>Hilos: varios camareros trabajando a la vez</h1>
+  <h2>Hasta ahora, un solo camarero lo hacía todo, una cosa detrás de otra. Ahora contratamos varios… y aparece un problema nuevo: se pisan.</h2>
+  <div class="grid3">
+    <div class="card azul"><span class="ico">🏪</span><b class="t">Proceso e hilo</b>«La cafetería y sus camareros, que comparten todo.» <br><small>pág. 2</small></div>
+    <div class="card verde"><span class="ico">▶️</span><b class="t">Runnable · Thread · start()</b>«El encargo, el camarero y "¡empieza!".» <br><small>pág. 3 · H01</small></div>
+    <div class="card"><span class="ico">🔄</span><b class="t">Ciclo de vida</b>«Contratado → trabajando ↔ esperando → se va a casa.» <br><small>pág. 4 · H01</small></div>
+    <div class="card amar"><span class="ico">⏸️</span><b class="t">join · sleep · interrupt</b>«Espero a que acabes · siesta · una nota pidiendo que pares.» <br><small>pág. 5 · H02</small></div>
+    <div class="card mal"><span class="ico">🔒</span><b class="t">Condición de carrera + synchronized</b>«Si dos tocan lo mismo, se pisan. Candado: de uno en uno.» <br><small>pág. 6 · H03</small></div>
+    <div class="card nar"><span class="ico">📋</span><b class="t">Colecciones + comprobar y actuar</b>«Pregunta y coge en un solo paso: poll().» <br><small>pág. 7 · H04 · Cafeteria</small></div>
+  </div>
+  <div class="frase">Lo más importante del tema: <b>el orden de los hilos NO está garantizado</b>. Lo decide el sistema operativo, y tu programa tiene que funcionar en cualquier orden.</div>
+  <span class="tag">PSP · DAM 2º · Tema 1: Hilos</span><span class="num">1</span>
+</section>
+
+<!-- ============================================================== 2 PROCESO/HILO -->
+<section class="page">
+  <span class="chip">1 · PROCESO E HILO</span>
+  <h1>La cafetería y sus camareros</h1>
+  <svg viewBox="0 0 1000 330">
+    <rect x="20" y="20" width="600" height="290" rx="16" fill="#f8fafc" stroke="#334155" stroke-width="3"/>
+    <text x="40" y="50" font-size="18" font-weight="700">🏪 PROCESO = la cafetería (un programa en marcha)</text>
+    <rect x="50" y="200" width="540" height="90" rx="10" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+    <text x="320" y="225" text-anchor="middle" font-size="15" font-weight="700">MEMORIA COMPARTIDA</text>
+    <rect x="80" y="240" width="140" height="38" rx="6" fill="#fff" stroke="#b45309"/><text x="150" y="264" text-anchor="middle" font-size="14">💰 caja</text>
+    <rect x="250" y="240" width="140" height="38" rx="6" fill="#fff" stroke="#b45309"/><text x="320" y="264" text-anchor="middle" font-size="14">🍽️ barra</text>
+    <rect x="420" y="240" width="140" height="38" rx="6" fill="#fff" stroke="#b45309"/><text x="490" y="264" text-anchor="middle" font-size="14">📋 cola</text>
+    <g font-size="13" font-weight="700">
+      <circle cx="120" cy="115" r="38" fill="#64748b"/><text x="120" y="120" text-anchor="middle" style="fill:#fff">main</text>
+      <circle cx="260" cy="115" r="38" fill="#2563eb"/><text x="260" y="120" text-anchor="middle" style="fill:#fff">Hilo 1</text>
+      <circle cx="400" cy="115" r="38" fill="#2563eb"/><text x="400" y="120" text-anchor="middle" style="fill:#fff">Hilo 2</text>
+      <circle cx="540" cy="115" r="38" fill="#2563eb"/><text x="540" y="120" text-anchor="middle" style="fill:#fff">Hilo 3</text>
+    </g>
+    <g stroke="#475569" stroke-width="1.5" stroke-dasharray="4 4">
+      <line x1="120" y1="153" x2="150" y2="238"/><line x1="260" y1="153" x2="320" y2="238"/><line x1="400" y1="153" x2="320" y2="238"/><line x1="540" y1="153" x2="490" y2="238"/>
+    </g>
+    <rect x="170" y="168" width="300" height="20" fill="#f8fafc"/><text x="320" y="182" text-anchor="middle" font-size="13" style="fill:#475569">HILOS = los camareros: todos tocan lo mismo</text>
+    <rect x="660" y="20" width="320" height="140" rx="16" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 5"/>
+    <text x="820" y="50" text-anchor="middle" font-size="15" font-weight="700">🏪 OTRO proceso</text>
+    <text x="820" y="80" text-anchor="middle" font-size="13">su propia memoria</text>
+    <text x="820" y="105" text-anchor="middle" font-size="13">no puede tocar nuestra caja</text>
+    <text x="820" y="140" text-anchor="middle" font-size="22">🚫</text>
+    <text x="820" y="200" text-anchor="middle" font-size="14" font-weight="700">Todo programa empieza</text>
+    <text x="820" y="222" text-anchor="middle" font-size="14" font-weight="700">con UN hilo: el main</text>
+    <text x="820" y="260" text-anchor="middle" font-size="13" style="fill:#64748b">y desde él puede crear más</text>
+  </svg>
+  <div class="grid2" style="margin-top:3mm">
+    <div class="card azul"><b>Concurrencia</b> = varios camareros avanzan «a la vez».<br>Compartir memoria es <b>rápido</b> (no hay que copiar nada)… pero <b>peligroso</b> si dos tocan lo mismo a la vez (pág. 6).</div>
+    <div class="card mal"><b>El orden NO está garantizado</b><br>Ejecuta <span class="mono">H01</span> varias veces: «Camarero 1 atiende mesa 1» y «Camarero 2 atiende mesa 1» salen cada vez en un orden distinto.</div>
+  </div>
+  <span class="num">2</span>
+</section>
+
+<!-- ============================================================== 3 START VS RUN -->
+<section class="page">
+  <span class="chip">2 · CREAR Y ARRANCAR · H01</span>
+  <h1>El encargo, el camarero y «¡empieza!»</h1>
+  <div class="grid3">
+    <div class="card verde"><span class="ico">📝</span><b class="t">Runnable = el ENCARGO</b>qué hay que hacer, escrito en <span class="mono">run()</span></div>
+    <div class="card azul"><span class="ico">🧑‍🍳</span><b class="t">Thread = el CAMARERO</b><span class="mono">new Thread(encargo)</span></div>
+    <div class="card amar"><span class="ico">📣</span><b class="t">start() = «¡EMPIEZA!»</b>arranca un hilo nuevo, una sola vez</div>
+  </div>
+  <h3 style="margin-top:4mm">La trampa: start() frente a run()</h3>
+  <svg viewBox="0 0 1000 260">
+    <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker></defs>
+    <text x="235" y="20" text-anchor="middle" font-size="16" font-weight="700" style="fill:#16a34a">✅ t.start(): dos trabajando a la vez</text>
+    <text x="765" y="20" text-anchor="middle" font-size="16" font-weight="700" style="fill:#dc2626">❌ t.run(): lo hace el main solo</text>
+    <g font-size="13" font-weight="700"><text x="0" y="68">main</text><text x="0" y="148" style="fill:#2563eb">hilo nuevo</text><text x="530" y="68">main</text></g>
+    <rect x="80" y="50" width="70" height="30" fill="#64748b"/><text x="115" y="70" text-anchor="middle" font-size="12" class="mono" style="fill:#fff">start()</text>
+    <rect x="150" y="50" width="300" height="30" fill="#94a3b8"/><text x="300" y="70" text-anchor="middle" font-size="12" style="fill:#fff">sigue a lo suyo</text>
+    <line x1="115" y1="82" x2="160" y2="128" stroke="#475569" stroke-width="2" marker-end="url(#a3)"/>
+    <rect x="160" y="130" width="290" height="30" fill="#2563eb"/><text x="305" y="150" text-anchor="middle" font-size="12" class="mono" style="fill:#fff">run()  ← en el hilo NUEVO</text>
+    <text x="265" y="195" text-anchor="middle" font-size="13" class="mono">«Me ejecuta: HiloNuevo»</text>
+    <rect x="610" y="50" width="70" height="30" fill="#64748b"/><text x="645" y="70" text-anchor="middle" font-size="12" class="mono" style="fill:#fff">run()</text>
+    <rect x="680" y="50" width="200" height="30" fill="#dc2626"/><text x="780" y="70" text-anchor="middle" font-size="12" style="fill:#fff">el encargo, en el main</text>
+    <rect x="880" y="50" width="100" height="30" fill="#94a3b8"/><text x="930" y="70" text-anchor="middle" font-size="12" style="fill:#fff">luego sigue</text>
+    <text x="795" y="130" text-anchor="middle" font-size="13" style="fill:#64748b">no hay hilo nuevo: es una llamada normal</text>
+    <text x="795" y="195" text-anchor="middle" font-size="13" class="mono">«Me ejecuta: main»</text>
+    <line x1="80" y1="225" x2="455" y2="225" stroke="#475569" marker-end="url(#a3)"/><line x1="610" y1="225" x2="985" y2="225" stroke="#475569" marker-end="url(#a3)"/>
+    <text x="455" y="245" text-anchor="end" font-size="11" style="fill:#64748b">tiempo</text><text x="985" y="245" text-anchor="end" font-size="11" style="fill:#64748b">tiempo</text>
+  </svg>
+  <div class="grid2">
+<pre><span class="k">class</span> Camarero <span class="k">implements</span> Runnable {   <span class="c">// el encargo</span>
+    <span class="k">public void</span> run() { ... }
+}
+Thread t = <span class="k">new</span> Thread(<span class="k">new</span> Camarero(1));
+t.start();                        <span class="g">// ✅</span></pre>
+    <div class="card mal"><b>start() una sola vez</b> → la 2.ª lanza <span class="mono">IllegalThreadStateException</span>.<br><br><b>Mejor implements Runnable</b> que extends Thread: solo se puede heredar de una clase.</div>
+  </div>
+  <span class="num">3</span>
+</section>
+
+<!-- ============================================================== 4 CICLO DE VIDA -->
+<section class="page">
+  <span class="chip">3 · CICLO DE VIDA · H01</span>
+  <h1>La vida de un camarero</h1>
+  <svg viewBox="0 0 1000 330">
+    <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker></defs>
+    <g stroke="#475569" stroke-width="2.5" fill="none" marker-end="url(#a4)">
+      <line x1="200" y1="100" x2="330" y2="100"/>
+      <line x1="590" y1="100" x2="760" y2="100"/>
+      <line x1="440" y1="135" x2="440" y2="200"/>
+      <line x1="480" y1="200" x2="480" y2="135"/>
+    </g>
+    <rect x="30" y="65" width="170" height="70" rx="12" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+    <text x="115" y="97" text-anchor="middle" font-size="18" font-weight="700" class="mono">NEW</text><text x="115" y="120" text-anchor="middle" font-size="12">contratado</text>
+    <text x="265" y="88" text-anchor="middle" font-size="13" class="mono" font-weight="700">start()</text>
+    <rect x="335" y="65" width="255" height="70" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2.5"/>
+    <text x="462" y="97" text-anchor="middle" font-size="18" font-weight="700" class="mono">RUNNABLE</text><text x="462" y="120" text-anchor="middle" font-size="12">trabajando (o listo para trabajar)</text>
+    <text x="675" y="88" text-anchor="middle" font-size="13" font-weight="700">acaba run()</text>
+    <rect x="765" y="65" width="200" height="70" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="865" y="97" text-anchor="middle" font-size="18" font-weight="700" class="mono">TERMINATED</text><text x="865" y="120" text-anchor="middle" font-size="12">se ha ido a casa</text>
+    <rect x="200" y="205" width="520" height="95" rx="12" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+    <text x="460" y="230" text-anchor="middle" font-size="15" font-weight="700">ESPERANDO</text>
+    <text x="220" y="258" font-size="13"><tspan class="mono" font-weight="700">BLOCKED</tspan>: quiere un candado (synchronized) que tiene otro</text>
+    <text x="220" y="278" font-size="13"><tspan class="mono" font-weight="700">WAITING</tspan>: espera sin límite (join(), wait())</text>
+    <text x="220" y="296" font-size="13"><tspan class="mono" font-weight="700">TIMED_WAITING</tspan>: espera con límite (sleep(ms), join(ms))</text>
+    <text x="410" y="172" text-anchor="end" font-size="12" style="fill:#64748b">se bloquea / duerme</text>
+    <text x="510" y="172" font-size="12" style="fill:#64748b">se libera / despierta</text>
+    <text x="865" y="190" text-anchor="middle" font-size="14" font-weight="700" style="fill:#dc2626">y de aquí no vuelve:</text>
+    <text x="865" y="210" text-anchor="middle" font-size="13">otro start() → error</text>
+  </svg>
+  <div class="frase">En H01: «Estado de t1 antes de start(): <b>NEW</b>» · «al terminar: <b>TERMINATED</b>». Se consulta con <span class="mono">t.getState()</span> o <span class="mono">t.isAlive()</span>.</div>
+  <span class="num">4</span>
+</section>
+
+<!-- ============================================================== 5 JOIN -->
+<section class="page">
+  <span class="chip">4 · JOIN, SLEEP E INTERRUPT · H02</span>
+  <h1>Espero a que acabes · siesta · una nota</h1>
+  <svg viewBox="0 0 1000 250">
+    <defs>
+      <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+      <pattern id="r5" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#e5e7eb"/><line x1="0" y1="0" x2="0" y2="8" stroke="#9ca3af" stroke-width="3"/></pattern>
+    </defs>
+    <g font-size="13" font-weight="700"><text x="0" y="45">main</text><text x="0" y="105" style="fill:#2563eb">Camarero 1</text><text x="0" y="145" style="fill:#2563eb">Camarero 2</text><text x="0" y="185" style="fill:#2563eb">Camarero 3</text></g>
+    <rect x="110" y="27" width="90" height="28" fill="#64748b"/><text x="155" y="46" text-anchor="middle" font-size="12" class="mono" style="fill:#fff">start() ×3</text>
+    <rect x="200" y="27" width="440" height="28" fill="url(#r5)"/><text x="420" y="46" text-anchor="middle" font-size="13" font-weight="700">join() ×3: espero a que acaben TODOS</text>
+    <rect x="640" y="27" width="300" height="28" fill="#16a34a"/><text x="790" y="46" text-anchor="middle" font-size="12" style="fill:#fff">hago la caja: ahora sí cuadra ✅</text>
+    <rect x="200" y="87" width="300" height="28" fill="#2563eb"/><rect x="200" y="127" width="440" height="28" fill="#2563eb"/><rect x="200" y="167" width="220" height="28" fill="#2563eb"/>
+    <line x1="640" y1="20" x2="640" y2="205" stroke="#16a34a" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="646" y="80" font-size="12" style="fill:#16a34a">acaba el último → el main sigue</text>
+    <line x1="110" y1="225" x2="960" y2="225" stroke="#475569" marker-end="url(#a5)"/><text x="960" y="243" text-anchor="end" font-size="11" style="fill:#64748b">tiempo</text>
+  </svg>
+  <div class="grid3" style="margin-top:2mm">
+    <div class="card amar"><b class="t">join(): espero a que acabes</b>Sin join, el main hace la caja <b>antes</b> de que terminen.<br><small>H02: «no he esperado, ¿el hilo sigue vivo? true»</small></div>
+    <div class="card azul"><b class="t">sleep(ms): siesta</b>Duerme al hilo <b>que ejecuta esa línea</b>. Sirve para simular que algo tarda.</div>
+    <div class="card verde"><b class="t">interrupt(): una nota 📝</b><b>No lo echa:</b> le pide que pare. Él mira <span class="mono">isInterrupted()</span> y sale limpio.<br><small>H02: «me han interrumpido, salgo limpiamente»</small></div>
+  </div>
+  <div class="frase">Esquema de siempre: <b>preparar lo compartido → crear → start() a TODOS → join() a TODOS → resultado</b>. Nunca start+join en el mismo bucle.</div>
+  <span class="num">5</span>
+</section>
+
+<!-- ============================================================== 6 CARRERA -->
+<section class="page">
+  <span class="chip">5 · CONDICIÓN DE CARRERA Y SYNCHRONIZED · H03</span>
+  <h1>Se pisan… y el candado lo arregla</h1>
+  <svg viewBox="0 0 1000 175">
+    <g font-size="14" font-weight="700"><text x="0" y="40" style="fill:#2563eb">Camarero A</text><text x="0" y="90" style="fill:#ea580c">Camarero B</text><text x="0" y="145">caja</text></g>
+    <g font-size="13">
+      <rect x="110" y="22" width="110" height="30" fill="#dbeafe" stroke="#2563eb"/><text x="165" y="42" text-anchor="middle">mira: 5</text>
+      <rect x="220" y="22" width="110" height="30" fill="#dbeafe" stroke="#2563eb"/><text x="275" y="42" text-anchor="middle">5 + 1</text>
+      <rect x="330" y="22" width="110" height="30" fill="#2563eb"/><text x="385" y="42" text-anchor="middle" style="fill:#fff">apunta 6</text>
+      <rect x="170" y="72" width="110" height="30" fill="#ffedd5" stroke="#ea580c"/><text x="225" y="92" text-anchor="middle">mira: 5 ⚠</text>
+      <rect x="280" y="72" width="110" height="30" fill="#ffedd5" stroke="#ea580c"/><text x="335" y="92" text-anchor="middle">5 + 1</text>
+      <rect x="390" y="72" width="110" height="30" fill="#ea580c"/><text x="445" y="92" text-anchor="middle" style="fill:#fff">apunta 6</text>
+      <rect x="110" y="127" width="220" height="30" fill="#f1f5f9" stroke="#94a3b8"/><text x="220" y="147" text-anchor="middle" class="mono">5</text>
+      <rect x="330" y="127" width="170" height="30" fill="#f1f5f9" stroke="#94a3b8"/><text x="415" y="147" text-anchor="middle" class="mono">6</text>
+      <rect x="500" y="127" width="80" height="30" fill="#fee2e2" stroke="#dc2626"/><text x="540" y="147" text-anchor="middle" class="mono" style="fill:#dc2626">6 ❌</text>
+    </g>
+    <text x="620" y="70" font-size="15" font-weight="700" style="fill:#dc2626">2 ventas → solo +1: CONDICIÓN DE CARRERA</text>
+    <text x="620" y="95" font-size="13">el resultado depende de quién llega antes</text>
+    <text x="620" y="135" font-size="13" style="fill:#64748b">H03: esperado 400 000 → sin candado: 125 564</text>
+    <text x="620" y="155" font-size="13" font-weight="700" style="fill:#16a34a">con synchronized: 400 000 ✅</text>
+  </svg>
+  <h3>Regla 1 del candado: tiene que ser EL MISMO para todos</h3>
+  <svg viewBox="0 0 1000 175">
+    <text x="235" y="18" text-anchor="middle" font-size="15" font-weight="700" style="fill:#16a34a">✅ un candado compartido (static final)</text>
+    <text x="765" y="18" text-anchor="middle" font-size="15" font-weight="700" style="fill:#dc2626">❌ un candado por camarero</text>
+    <rect x="185" y="60" width="100" height="70" rx="10" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/><text x="235" y="103" text-anchor="middle" font-size="28">🔒</text>
+    <g font-size="12" font-weight="700">
+      <circle cx="60" cy="60" r="24" fill="#2563eb"/><text x="60" y="65" text-anchor="middle" style="fill:#fff">A</text>
+      <circle cx="60" cy="135" r="24" fill="#ea580c"/><text x="60" y="140" text-anchor="middle" style="fill:#fff">B</text>
+    </g>
+    <line x1="85" y1="65" x2="183" y2="90" stroke="#16a34a" stroke-width="3"/>
+    <line x1="85" y1="130" x2="183" y2="105" stroke="#94a3b8" stroke-width="3" stroke-dasharray="6 4"/>
+    <text x="320" y="85" font-size="13">A dentro</text><text x="320" y="110" font-size="13">B espera</text>
+    <text x="320" y="135" font-size="13" font-weight="700" style="fill:#16a34a">→ de uno en uno</text>
+    <line x1="490" y1="10" x2="490" y2="170" stroke="#cbd5e1" stroke-width="2"/>
+    <g font-size="12" font-weight="700">
+      <circle cx="580" cy="60" r="24" fill="#2563eb"/><text x="580" y="65" text-anchor="middle" style="fill:#fff">A</text>
+      <circle cx="580" cy="135" r="24" fill="#ea580c"/><text x="580" y="140" text-anchor="middle" style="fill:#fff">B</text>
+    </g>
+    <rect x="660" y="35" width="70" height="50" rx="8" fill="#fef9c3" stroke="#ca8a04"/><text x="695" y="68" text-anchor="middle" font-size="20">🔒</text>
+    <rect x="660" y="110" width="70" height="50" rx="8" fill="#fef9c3" stroke="#ca8a04"/><text x="695" y="143" text-anchor="middle" font-size="20">🔒</text>
+    <line x1="605" y1="60" x2="658" y2="60" stroke="#dc2626" stroke-width="3"/><line x1="605" y1="135" x2="658" y2="135" stroke="#dc2626" stroke-width="3"/>
+    <text x="760" y="85" font-size="13">cada uno abre el suyo</text>
+    <text x="760" y="110" font-size="13" font-weight="700" style="fill:#dc2626">→ entran los dos a la vez</text>
+    <text x="760" y="135" font-size="12" style="fill:#64748b">(o: cada camarero con su propio new Caja())</text>
+  </svg>
+  <div class="grid2" style="margin-top:2mm">
+<pre><span class="k">private static final</span> Object LOCK = <span class="k">new</span> Object();
+<span class="k">synchronized</span> (LOCK) {
+    caja++;          <span class="c">// sección crítica: de uno en uno</span>
+}                    <span class="c">// se suelta SOLO al salir</span></pre>
+    <div class="card amar"><b>Regla 2: solo lo imprescindible dentro.</b> Dentro van de uno en uno: si metes todo el <span class="mono">run()</span>, es como tener un solo camarero.</div>
+  </div>
+  <span class="num">6</span>
+</section>
+
+<!-- ============================================================== 7 COMPROBAR Y ACTUAR -->
+<section class="page">
+  <span class="chip">6 · COLECCIONES Y «COMPROBAR Y LUEGO ACTUAR» · H04 · Cafeteria</span>
+  <h1>Pregunta y coge en un solo paso</h1>
+  <h2>Cola segura (ConcurrentLinkedQueue) con 1 cliente dentro y 2 camareros. Cada operación es segura… pero dos seguidas no.</h2>
+  <svg viewBox="0 0 1000 220">
+    <g font-size="14" font-weight="700"><text x="0" y="45" style="fill:#2563eb">Camarero 1</text><text x="0" y="105" style="fill:#ea580c">Camarero 2</text><text x="0" y="170">cola</text></g>
+    <g font-size="12.5">
+      <rect x="110" y="25" width="170" height="32" fill="#dbeafe" stroke="#2563eb"/><text x="195" y="46" text-anchor="middle" class="mono">isEmpty()? → no</text>
+      <rect x="400" y="25" width="170" height="32" fill="#2563eb"/><text x="485" y="46" text-anchor="middle" class="mono" style="fill:#fff">poll() → Cliente#9</text>
+      <rect x="200" y="85" width="170" height="32" fill="#ffedd5" stroke="#ea580c"/><text x="285" y="106" text-anchor="middle" class="mono">isEmpty()? → no</text>
+      <rect x="580" y="85" width="170" height="32" fill="#dc2626"/><text x="665" y="106" text-anchor="middle" class="mono" style="fill:#fff">poll() → null ❌</text>
+      <rect x="110" y="150" width="460" height="32" fill="#f1f5f9" stroke="#94a3b8"/><text x="340" y="171" text-anchor="middle">[ Cliente#9 ]</text>
+      <rect x="570" y="150" width="200" height="32" fill="#fee2e2" stroke="#dc2626"/><text x="670" y="171" text-anchor="middle">[ vacía ]</text>
+    </g>
+    <rect x="370" y="20" width="30" height="102" fill="#fef9c3" opacity=".8"/><text x="385" y="137" text-anchor="middle" font-size="11" font-weight="700" style="fill:#ca8a04">hueco</text>
+    <text x="800" y="60" font-size="14" font-weight="700" style="fill:#dc2626">Entre COMPROBAR</text>
+    <text x="800" y="80" font-size="14" font-weight="700" style="fill:#dc2626">y ACTUAR hay un hueco</text>
+    <text x="800" y="100" font-size="13">y otro se cuela</text>
+  </svg>
+  <div class="grid2">
+<pre><span class="m">// ❌ dos operaciones → hueco</span>
+<span class="k">while</span> (!cola.isEmpty()) {
+    String c = cola.poll();      <span class="c">// puede ser null</span>
+}
+
+<span class="g">// ✅ una sola operación</span>
+String c;
+<span class="k">while</span> ((c = cola.poll()) != <span class="k">null</span>) {
+    atender(c);
+}</pre>
+    <div>
+      <table>
+        <tr><th>Normal</th><th>Segura para hilos</th></tr>
+        <tr><td class="mono">LinkedList (Queue)</td><td class="mono">ConcurrentLinkedQueue</td></tr>
+        <tr><td class="mono">HashMap</td><td class="mono">ConcurrentHashMap</td></tr>
+        <tr><td class="mono">ArrayList</td><td class="mono">CopyOnWriteArrayList</td></tr>
+      </table>
+      <div class="card mal" style="margin-top:3mm">H04: <span class="mono">ArrayList</span> con varios hilos: esperado 2000 → <b>1984</b>. <span class="mono">CopyOnWriteArrayList</span>: <b>2000</b> ✅</div>
+      <div class="card azul" style="margin-top:3mm">Esta trampa vuelve en el <b>tema 3</b>: entre soltar el readLock y coger el writeLock hay un hueco → hay que volver a comprobar.</div>
+    </div>
+  </div>
+  <span class="num">7</span>
+</section>
+
+<!-- ============================================================== 8 RESUMEN -->
+<section class="page">
+  <span class="chip">7 · RESUMEN</span>
+  <h1>El tema 1 en una página</h1>
+  <table style="font-size:12pt">
+    <tr><th>Concepto</th><th>Frase clave</th><th>Error típico</th></tr>
+    <tr><td>Proceso / hilo</td><td>La cafetería y sus camareros, que comparten todo</td><td>Creer que cada hilo tiene sus propios datos</td></tr>
+    <tr><td>Orden de ejecución</td><td>Lo decide el sistema operativo</td><td>Suponer que un hilo va antes que otro</td></tr>
+    <tr><td><span class="mono">Runnable</span> / <span class="mono">Thread</span></td><td>El encargo y el camarero</td><td>—</td></tr>
+    <tr><td><span class="mono">start()</span></td><td>«¡Empieza!»: hilo nuevo</td><td>Llamar a <span class="mono">run()</span> · <span class="mono">start()</span> dos veces</td></tr>
+    <tr><td><span class="mono">join()</span></td><td>Espero a que acabes</td><td><span class="mono">start</span> y <span class="mono">join</span> en el mismo bucle · no esperar</td></tr>
+    <tr><td><span class="mono">interrupt()</span></td><td>Una nota pidiendo que pare</td><td>Creer que lo mata</td></tr>
+    <tr><td>Condición de carrera</td><td>Dos tocan lo mismo y se pisan</td><td><span class="mono">contador++</span> sin proteger</td></tr>
+    <tr><td><span class="mono">synchronized</span></td><td>Candado: de uno en uno</td><td>Un candado por hilo · meter todo dentro</td></tr>
+    <tr><td>Colección concurrente</td><td>Segura en cada operación, no en dos seguidas</td><td><span class="mono">isEmpty()</span> + <span class="mono">poll()</span></td></tr>
+  </table>
+  <div class="frase" style="margin-top:5mm">Del tema 1 al 2: aquí los camareros solo tienen que <b>no pisarse</b>. En el tema 2 además tendrán que <b>coordinarse</b> (esperarse, turnarse en un pool y devolverse resultados).</div>
+  <span class="num">8</span>
+</section>
+
+</body>
+</html>

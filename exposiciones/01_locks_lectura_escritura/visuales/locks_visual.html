@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Locks de lectura y escritura</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  :root {
+    --lector: #2563eb; --lector-claro: #dbeafe;
+    --escritor: #ea580c; --escritor-claro: #ffedd5;
+    --espera: #9ca3af; --ok: #16a34a; --ok-claro: #dcfce7;
+    --mal: #dc2626; --mal-claro: #fee2e2;
+    --opt: #059669; --opt-claro: #d1fae5;
+    --tinta: #1e293b; --suave: #64748b; --fondo: #ffffff; --linea: #cbd5e1;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--tinta);
+         font-family: "Segoe UI", system-ui, sans-serif; }
+  .page { width: 297mm; height: 210mm; padding: 11mm 14mm 9mm; position: relative;
+          page-break-after: always; overflow: hidden; display: flex; flex-direction: column; }
+  .page:last-child { page-break-after: auto; }
+  .num { position: absolute; right: 14mm; bottom: 6mm; color: var(--suave); font-size: 10pt; }
+  .tag { position: absolute; left: 14mm; bottom: 6mm; color: var(--suave); font-size: 9pt; }
+  h1 { font-size: 24pt; margin: 0 0 2mm; }
+  h2 { font-size: 13pt; margin: 0 0 4mm; color: var(--suave); font-weight: 500; }
+  h3 { font-size: 13pt; margin: 3mm 0 2mm; }
+  .nivel { display: inline-block; font-size: 9pt; font-weight: 700; padding: 1mm 3mm; border-radius: 99px;
+           margin-bottom: 2mm; letter-spacing: .5px; }
+  .alto { background: var(--ok-claro); color: var(--ok); }
+  .bajo { background: var(--lector-claro); color: var(--lector); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: "Segoe UI", system-ui, sans-serif; fill: var(--tinta); }
+  .mono, svg .mono { font-family: Consolas, "Cascadia Mono", monospace; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7mm; align-items: start; }
+  .card { border: 1.5px solid var(--linea); border-radius: 4mm; padding: 4mm 5mm; font-size: 11.5pt; }
+  .card b.big { font-size: 15pt; display: block; margin-bottom: 1mm; }
+  .card.ok { border-color: var(--ok); background: var(--ok-claro); }
+  .card.mal { border-color: var(--mal); background: var(--mal-claro); }
+  .card.azul { border-color: var(--lector); background: var(--lector-claro); }
+  .card.nar { border-color: var(--escritor); background: var(--escritor-claro); }
+  .card.verde { border-color: var(--opt); background: var(--opt-claro); }
+  .frase { margin-top: auto; border-left: 5px solid var(--lector); background: #f1f5f9;
+           padding: 3mm 5mm; font-size: 13pt; border-radius: 0 3mm 3mm 0; }
+  pre { font-family: Consolas, monospace; font-size: 10.5pt; background: #0f172a; color: #e2e8f0;
+        padding: 4mm 5mm; border-radius: 3mm; margin: 0; line-height: 1.45; }
+  pre .c { color: #94a3b8; } pre .k { color: #f472b6; } pre .r { color: #93c5fd; } pre .w { color: #fdba74; }
+  pre .g { color: #6ee7b7; }
+  table { border-collapse: collapse; width: 100%; font-size: 11pt; }
+  th, td { border: 1px solid var(--linea); padding: 2mm 3mm; text-align: center; }
+  th { background: #f1f5f9; }
+  td.si { background: var(--ok-claro); color: var(--ok); font-weight: 700; }
+  td.no { background: var(--mal-claro); color: var(--mal); font-weight: 700; }
+  td.izq, th.izq { text-align: left; }
+  .matriz td, .matriz th { font-size: 14pt; padding: 4mm; }
+  ul { margin: 1mm 0; padding-left: 5mm; } li { margin: 1mm 0; }
+  .barra { display: grid; grid-template-columns: 48mm 1fr 34mm; align-items: center; gap: 3mm;
+           margin: 2.2mm 0; font-size: 11pt; }
+  .barra .b { height: 8mm; border-radius: 2mm; display: flex; align-items: center; padding-left: 2mm;
+              color: #fff; font-weight: 700; font-size: 10pt; min-width: 14mm; }
+  .portada { justify-content: center; }
+</style>
+</head>
+<body>
+
+<!-- ================================================================ 1 -->
+<section class="page">
+  <span class="nivel alto">NIVEL ALTO · EL PROBLEMA</span>
+  <h1>Locks de lectura y escritura en Java</h1>
+  <h2>Muchos hilos leen el mismo dato y pocos lo modifican. ¿Cómo lo protegemos sin frenar a todos?</h2>
+  <svg viewBox="0 0 1000 300">
+    <defs>
+      <marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    </defs>
+    <text x="250" y="22" text-anchor="middle" font-size="18" font-weight="700" style="fill:#2563eb">Muchos CONSULTAN (leen)</text>
+    <g font-size="15" font-weight="700">
+      <circle cx="110" cy="50"  r="22" fill="#2563eb"/><text x="110" y="55"  text-anchor="middle" style="fill:#fff">L1</text>
+      <circle cx="110" cy="105" r="22" fill="#2563eb"/><text x="110" y="110" text-anchor="middle" style="fill:#fff">L2</text>
+      <circle cx="110" cy="160" r="22" fill="#2563eb"/><text x="110" y="165" text-anchor="middle" style="fill:#fff">L3</text>
+      <circle cx="110" cy="215" r="22" fill="#2563eb"/><text x="110" y="220" text-anchor="middle" style="fill:#fff">L4</text>
+      <circle cx="110" cy="270" r="22" fill="#2563eb"/><text x="110" y="275" text-anchor="middle" style="fill:#fff">L5</text>
+    </g>
+    <g stroke="#475569" stroke-width="2" marker-end="url(#fl)">
+      <line x1="135" y1="50" x2="375" y2="120"/><line x1="135" y1="105" x2="375" y2="135"/>
+      <line x1="135" y1="160" x2="375" y2="150"/><line x1="135" y1="215" x2="375" y2="165"/>
+      <line x1="135" y1="270" x2="375" y2="180"/>
+    </g>
+    <rect x="380" y="70" width="250" height="160" rx="14" fill="#f8fafc" stroke="#334155" stroke-width="2.5"/>
+    <text x="505" y="100" text-anchor="middle" font-size="17" font-weight="700">Ficha de vulnerabilidad</text>
+    <text x="505" y="130" text-anchor="middle" font-size="15" class="mono">CVE-2026-1234</text>
+    <text x="505" y="160" text-anchor="middle" font-size="15">Gravedad: ALTA</text>
+    <text x="505" y="190" text-anchor="middle" font-size="15">Parche: v2.1</text>
+    <text x="505" y="218" text-anchor="middle" font-size="12" style="fill:#64748b">(el recurso compartido)</text>
+    <line x1="830" y1="150" x2="636" y2="150" stroke="#ea580c" stroke-width="3" marker-end="url(#fl)"/>
+    <circle cx="865" cy="150" r="32" fill="#ea580c"/>
+    <text x="865" y="157" text-anchor="middle" font-size="20" font-weight="700" style="fill:#fff">E</text>
+    <text x="865" y="210" text-anchor="middle" font-size="18" font-weight="700" style="fill:#ea580c">Uno MODIFICA</text>
+    <text x="865" y="232" text-anchor="middle" font-size="14" style="fill:#64748b">(el analista)</text>
+  </svg>
+  <div class="grid3" style="margin-top:4mm">
+    <div class="card ok"><b class="big">Lector + lector ✅</b>Inofensivo: mirar no cambia nada. <b>Podrían estar a la vez.</b></div>
+    <div class="card mal"><b class="big">Lector + escritor ❌</b>El lector puede ver el dato <b>a medias</b> (mitad viejo, mitad nuevo).</div>
+    <div class="card mal"><b class="big">Escritor + escritor ❌</b>Uno <b>machaca</b> los cambios del otro.</div>
+  </div>
+  <div class="frase" style="margin-top:5mm">«Leer a la vez no es peligroso. Lo peligroso es <b>leer mientras alguien escribe</b>.»</div>
+  <span class="tag">PSP · DAM 2º · Locks de lectura y escritura</span><span class="num">1</span>
+</section>
+
+<!-- ================================================================ 2 -->
+<section class="page">
+  <span class="nivel alto">NIVEL ALTO · EL PROBLEMA</span>
+  <h1>Un dato «a medias» y por qué synchronized no basta</h1>
+  <h3>① Sin protección: el lector mira justo entre los dos pasos del escritor</h3>
+  <svg viewBox="0 0 1000 215">
+    <defs>
+      <marker id="fl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    </defs>
+    <g font-size="15" font-weight="700">
+      <text x="10" y="45">Escritor</text><text x="10" y="112">Dato</text><text x="10" y="172">Lector</text>
+    </g>
+    <rect x="200" y="22" width="130" height="36" rx="6" fill="#ea580c"/>
+    <text x="265" y="46" text-anchor="middle" font-size="14" class="mono" style="fill:#fff">carta = 120</text>
+    <rect x="560" y="22" width="150" height="36" rx="6" fill="#ea580c"/>
+    <text x="635" y="46" text-anchor="middle" font-size="14" class="mono" style="fill:#fff">pizarra = 120</text>
+    <rect x="100" y="88" width="230" height="38" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="215" y="112" text-anchor="middle" font-size="14" class="mono">carta 100 · pizarra 100</text>
+    <rect x="330" y="88" width="380" height="38" fill="#fee2e2" stroke="#dc2626"/>
+    <text x="520" y="112" text-anchor="middle" font-size="14" class="mono" style="fill:#dc2626">carta 120 · pizarra 100  ⚠ a medias</text>
+    <rect x="710" y="88" width="250" height="38" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="835" y="112" text-anchor="middle" font-size="14" class="mono">carta 120 · pizarra 120</text>
+    <rect x="420" y="150" width="70" height="34" rx="6" fill="#2563eb"/>
+    <text x="455" y="173" text-anchor="middle" font-size="14" font-weight="700" style="fill:#fff">lee</text>
+    <line x1="455" y1="150" x2="455" y2="130" stroke="#2563eb" stroke-width="2.5" marker-end="url(#fl2)"/>
+    <text x="505" y="173" font-size="15" font-weight="700" style="fill:#dc2626">ve 120 / 100 → ¡LECTURA INCOHERENTE!</text>
+    <line x1="100" y1="203" x2="965" y2="203" stroke="#475569" stroke-width="1.5" marker-end="url(#fl2)"/>
+    <text x="965" y="198" text-anchor="end" font-size="12" style="fill:#64748b">tiempo</text>
+  </svg>
+  <h3>② Con un cerrojo normal se arregla… pero los lectores hacen cola entre ellos</h3>
+  <svg viewBox="0 0 1000 215">
+    <defs>
+      <pattern id="rayas" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="8" height="8" fill="#e5e7eb"/><line x1="0" y1="0" x2="0" y2="8" stroke="#9ca3af" stroke-width="3"/></pattern>
+    </defs>
+    <text x="230" y="18" text-anchor="middle" font-size="15" font-weight="700">synchronized / ReentrantLock</text>
+    <text x="760" y="18" text-anchor="middle" font-size="15" font-weight="700">ReentrantReadWriteLock</text>
+    <g font-size="13" font-weight="700">
+      <text x="10" y="50">L1</text><text x="10" y="90">L2</text><text x="10" y="130">L3</text><text x="10" y="170">L4</text>
+      <text x="540" y="50">L1</text><text x="540" y="90">L2</text><text x="540" y="130">L3</text><text x="540" y="170">L4</text>
+    </g>
+    <rect x="40"  y="32" width="100" height="26" fill="#2563eb"/>
+    <rect x="40"  y="72" width="100" height="26" fill="url(#rayas)"/><rect x="140" y="72" width="100" height="26" fill="#2563eb"/>
+    <rect x="40"  y="112" width="200" height="26" fill="url(#rayas)"/><rect x="240" y="112" width="100" height="26" fill="#2563eb"/>
+    <rect x="40"  y="152" width="300" height="26" fill="url(#rayas)"/><rect x="340" y="152" width="100" height="26" fill="#2563eb"/>
+    <line x1="40" y1="190" x2="440" y2="190" stroke="#475569"/><text x="440" y="208" text-anchor="end" font-size="14" font-weight="700" style="fill:#dc2626">≈ 2400 ms (en fila)</text>
+    <rect x="570" y="32" width="100" height="26" fill="#2563eb"/><rect x="570" y="72" width="100" height="26" fill="#2563eb"/>
+    <rect x="570" y="112" width="100" height="26" fill="#2563eb"/><rect x="570" y="152" width="100" height="26" fill="#2563eb"/>
+    <line x1="570" y1="190" x2="970" y2="190" stroke="#475569"/><text x="670" y="208" text-anchor="middle" font-size="14" font-weight="700" style="fill:#16a34a">≈ 560 ms (a la vez)</text>
+    <text x="700" y="100" font-size="14" style="fill:#64748b">4 lectores dentro a la vez</text>
+    <rect x="700" y="130" width="22" height="14" fill="#2563eb"/><text x="728" y="143" font-size="12">leyendo</text>
+    <rect x="800" y="130" width="22" height="14" fill="url(#rayas)"/><text x="828" y="143" font-size="12">esperando</text>
+  </svg>
+  <div class="frase">Salida real de las demos <span class="mono">L01</span> (377 lecturas incoherentes), <span class="mono">L02</span> (0 incoherentes, 2414 ms) y <span class="mono">L03</span> (0 incoherentes, 555 ms).</div>
+  <span class="num">2</span>
+</section>
+
+<!-- ================================================================ 3 -->
+<section class="page">
+  <span class="nivel alto">NIVEL ALTO · ANALOGÍA</span>
+  <h1>La biblioteca: un pase o dos tipos de pase</h1>
+  <svg viewBox="0 0 1000 400">
+    <text x="240" y="24" text-anchor="middle" font-size="19" font-weight="700">Lock tradicional: UN pase para todo</text>
+    <text x="760" y="24" text-anchor="middle" font-size="19" font-weight="700">Lock lectura/escritura: DOS tipos de pase</text>
+    <!-- sala izquierda -->
+    <rect x="40" y="45" width="400" height="210" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.5"/>
+    <text x="60" y="72" font-size="14" style="fill:#64748b">📚 Sala de estanterías (el dato)</text>
+    <circle cx="240" cy="160" r="30" fill="#2563eb"/><text x="240" y="167" text-anchor="middle" font-size="18" font-weight="700" style="fill:#fff">L1</text>
+    <rect x="280" y="140" width="80" height="26" rx="5" fill="#fde68a" stroke="#b45309"/><text x="320" y="158" text-anchor="middle" font-size="13">🎫 pase</text>
+    <rect x="200" y="250" width="80" height="10" fill="#fff"/>
+    <g font-size="15" font-weight="700">
+      <circle cx="110" cy="320" r="24" fill="#2563eb"/><text x="110" y="326" text-anchor="middle" style="fill:#fff">L2</text>
+      <circle cx="180" cy="320" r="24" fill="#2563eb"/><text x="180" y="326" text-anchor="middle" style="fill:#fff">L3</text>
+      <circle cx="250" cy="320" r="24" fill="#2563eb"/><text x="250" y="326" text-anchor="middle" style="fill:#fff">L4</text>
+      <circle cx="320" cy="320" r="24" fill="#ea580c"/><text x="320" y="326" text-anchor="middle" style="fill:#fff">E</text>
+    </g>
+    <text x="240" y="375" text-anchor="middle" font-size="15" style="fill:#dc2626" font-weight="700">Todos en fila, aunque solo vayan a mirar</text>
+    <!-- sala derecha -->
+    <rect x="560" y="45" width="400" height="210" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.5"/>
+    <text x="580" y="72" font-size="14" style="fill:#64748b">📚 Sala de estanterías (el dato)</text>
+    <g font-size="16" font-weight="700">
+      <circle cx="640" cy="140" r="26" fill="#2563eb"/><text x="640" y="146" text-anchor="middle" style="fill:#fff">L1</text>
+      <circle cx="730" cy="140" r="26" fill="#2563eb"/><text x="730" y="146" text-anchor="middle" style="fill:#fff">L2</text>
+      <circle cx="820" cy="140" r="26" fill="#2563eb"/><text x="820" y="146" text-anchor="middle" style="fill:#fff">L3</text>
+      <circle cx="905" cy="140" r="26" fill="#2563eb"/><text x="905" y="146" text-anchor="middle" style="fill:#fff">L4</text>
+    </g>
+    <text x="770" y="205" text-anchor="middle" font-size="15" style="fill:#2563eb" font-weight="700">🎫🎫🎫🎫 pases de LECTOR: se reparten a muchos</text>
+    <rect x="720" y="250" width="80" height="10" fill="#fff"/>
+    <circle cx="760" cy="320" r="28" fill="#ea580c"/><text x="760" y="327" text-anchor="middle" font-size="18" font-weight="700" style="fill:#fff">E</text>
+    <rect x="800" y="306" width="150" height="28" rx="5" fill="#ffedd5" stroke="#ea580c"/><text x="875" y="325" text-anchor="middle" font-size="13">🔑 pase ÚNICO</text>
+    <text x="760" y="372" text-anchor="middle" font-size="15" style="fill:#ea580c" font-weight="700">Espera a que la sala esté VACÍA.</text><text x="760" y="393" text-anchor="middle" font-size="15" style="fill:#ea580c" font-weight="700">Y mientras reorganiza, no entra nadie.</text>
+  </svg>
+  <div class="grid2" style="margin-top:2mm">
+    <div class="card azul"><b>¿Por qué pueden leer varios a la vez?</b><br>Porque leer no cambia nada: diez personas leyendo el mismo libro no se molestan.</div>
+    <div class="card nar"><b>¿Por qué escribir requiere estar solo?</b><br>Si alguien consulta mientras se mueven los libros, verá la estantería <b>a medio ordenar</b>.</div>
+  </div>
+  <span class="num">3</span>
+</section>
+
+<!-- ================================================================ 4 -->
+<section class="page">
+  <span class="nivel bajo">NIVEL BAJO · ReentrantReadWriteLock</span>
+  <h1>Un objeto, dos cerrojos: readLock() y writeLock()</h1>
+  <div class="grid2" style="margin-top:3mm">
+    <div>
+      <h3>¿Quién puede entrar?</h3>
+      <table class="matriz">
+        <tr><th>Dentro hay… \ llega…</th><th style="color:#2563eb">Lector</th><th style="color:#ea580c">Escritor</th></tr>
+        <tr><th>Nadie</th><td class="si">✅ entra</td><td class="si">✅ entra</td></tr>
+        <tr><th>1 o más lectores</th><td class="si">✅ entra</td><td class="no">❌ espera</td></tr>
+        <tr><th>Un escritor</th><td class="no">❌ espera</td><td class="no">❌ espera</td></tr>
+      </table>
+      <div class="grid2" style="margin-top:5mm; gap:4mm">
+        <div class="card azul"><b>readLock()</b><br>COMPARTIDO: muchos a la vez.</div>
+        <div class="card nar"><b>writeLock()</b><br>EXCLUSIVO: uno y nadie más.</div>
+      </div>
+      <div class="card" style="margin-top:4mm">
+        <b>ReadWriteLock</b> = <i>interfaz</i> (solo define los 2 métodos)<br>
+        <b>ReentrantReadWriteLock</b> = la <i>clase</i> que la implementa<br>
+        Los dos cerrojos son <span class="mono">Lock</span>: <span class="mono">lock()</span>, <span class="mono">unlock()</span>, <span class="mono">tryLock()</span>…
+      </div>
+    </div>
+    <div>
+      <h3>Cómo se usa</h3>
+<pre><span class="k">ReadWriteLock</span> rw = <span class="k">new</span> ReentrantReadWriteLock();
+<span class="r">Lock lectura</span>   = rw.readLock();
+<span class="w">Lock escritura</span> = rw.writeLock();
+
+<span class="c">// LEER (muchos hilos a la vez)</span>
+<span class="r">lectura.lock();</span>
+<span class="k">try</span> {
+    <span class="k">return</span> precio;
+} <span class="k">finally</span> {
+    <span class="r">lectura.unlock();</span>   <span class="c">// SIEMPRE</span>
+}
+
+<span class="c">// ESCRIBIR (uno solo, sin lectores)</span>
+<span class="w">escritura.lock();</span>
+<span class="k">try</span> {
+    precio = nuevo;
+} <span class="k">finally</span> {
+    <span class="w">escritura.unlock();</span> <span class="c">// SIEMPRE</span>
+}</pre>
+    </div>
+  </div>
+  <span class="num">4</span>
+</section>
+
+<!-- ================================================================ 5 -->
+<section class="page">
+  <span class="nivel bajo">NIVEL BAJO · ESPERAS, STARVATION Y FAIRNESS</span>
+  <h1>El escritor espera… y los nuevos lectores no se cuelan</h1>
+  <svg viewBox="0 0 1000 250">
+    <defs>
+      <pattern id="rayas5" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="8" height="8" fill="#e5e7eb"/><line x1="0" y1="0" x2="0" y2="8" stroke="#9ca3af" stroke-width="3"/></pattern>
+    </defs>
+    <g font-size="14" font-weight="700">
+      <text x="10" y="42">Lector-1</text><text x="10" y="87">Lector-2</text>
+      <text x="10" y="132" style="fill:#ea580c">Escritor</text><text x="10" y="177">Lector-3</text>
+    </g>
+    <rect x="150" y="22" width="346" height="30" fill="#2563eb"/><text x="323" y="42" text-anchor="middle" font-size="13" style="fill:#fff">LEYENDO</text>
+    <rect x="151" y="67" width="345" height="30" fill="#2563eb"/><text x="323" y="87" text-anchor="middle" font-size="13" style="fill:#fff">LEYENDO</text>
+    <rect x="191" y="112" width="306" height="30" fill="url(#rayas5)"/><text x="344" y="132" text-anchor="middle" font-size="13">espera a que salgan TODOS</text>
+    <rect x="497" y="112" width="116" height="30" fill="#ea580c"/><text x="555" y="132" text-anchor="middle" font-size="13" style="fill:#fff">ESCRIBE solo</text>
+    <rect x="250" y="157" width="363" height="30" fill="url(#rayas5)"/><text x="431" y="177" text-anchor="middle" font-size="13">espera DETRÁS del escritor</text>
+    <rect x="613" y="157" width="345" height="30" fill="#2563eb"/><text x="785" y="177" text-anchor="middle" font-size="13" style="fill:#fff">LEYENDO</text>
+    <line x1="497" y1="15" x2="497" y2="200" stroke="#dc2626" stroke-dasharray="5 4" stroke-width="1.5"/>
+    <text x="503" y="14" font-size="12" style="fill:#dc2626">sale el último lector → entra el escritor</text>
+    <line x1="120" y1="210" x2="985" y2="210" stroke="#475569"/>
+    <g font-size="11" style="fill:#64748b" text-anchor="middle">
+      <text x="177" y="226">600 ms</text><text x="292" y="226">700</text><text x="407" y="226">800</text>
+      <text x="521" y="226">900</text><text x="636" y="226">1000</text><text x="751" y="226">1100</text><text x="865" y="226">1200</text><text x="980" y="226">1300</text>
+    </g>
+    <text x="560" y="246" text-anchor="middle" font-size="12" style="fill:#64748b">Tiempos reales de la demo L03 (parte 2)</text>
+  </svg>
+  <div class="grid2" style="margin-top:2mm">
+    <div>
+      <h3 style="color:#dc2626">Starvation: si los lectores pudieran colarse siempre…</h3>
+      <svg viewBox="0 0 480 170">
+        <defs><pattern id="rayas6" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="8" height="8" fill="#e5e7eb"/><line x1="0" y1="0" x2="0" y2="8" stroke="#9ca3af" stroke-width="3"/></pattern></defs>
+        <rect x="40" y="5" width="140" height="18" fill="#2563eb"/><rect x="120" y="27" width="140" height="18" fill="#2563eb"/>
+        <rect x="200" y="49" width="140" height="18" fill="#2563eb"/><rect x="280" y="71" width="140" height="18" fill="#2563eb"/>
+        <rect x="360" y="93" width="110" height="18" fill="#2563eb"/>
+        <text x="5" y="62" font-size="13" font-weight="700">L…</text>
+        <text x="5" y="140" font-size="13" font-weight="700" style="fill:#ea580c">E</text>
+        <rect x="40" y="124" width="430" height="24" fill="url(#rayas6)"/>
+        <text x="255" y="141" text-anchor="middle" font-size="13" font-weight="700" style="fill:#dc2626">esperando… ∞ nunca ve la sala vacía</text>
+      </svg>
+    </div>
+    <div>
+      <h3>Fairness (justicia)</h3>
+      <table>
+        <tr><th class="izq">Constructor</th><th class="izq">Comportamiento</th></tr>
+        <tr><td class="izq mono">new ReentrantReadWriteLock()</td><td class="izq"><b>No justo</b> (por defecto): más rápido, sin orden garantizado</td></tr>
+        <tr><td class="izq mono">new ReentrantReadWriteLock(true)</td><td class="izq"><b>Justo</b>: por orden de llegada → sin starvation, pero más lento</td></tr>
+      </table>
+      <h3>Subir y bajar</h3>
+      <table>
+        <tr><td class="izq">tengo <b>readLock</b> → pido <b>writeLock</b></td><td class="no">❌ me bloqueo para siempre (me espero a mí)</td></tr>
+        <tr><td class="izq">tengo <b>writeLock</b> → pido <b>readLock</b></td><td class="si">✅ se puede (downgrade)</td></tr>
+      </table>
+    </div>
+  </div>
+  <span class="num">5</span>
+</section>
+
+<!-- ================================================================ 6 -->
+<section class="page">
+  <span class="nivel alto">NIVEL ALTO · LECTURA OPTIMISTA</span>
+  <h1>Leer «a ojo» y comprobar después</h1>
+  <h2>La pizarra tiene un número de versión en la esquina. Cada vez que alguien la cambia, el número sube.</h2>
+  <svg viewBox="0 0 1000 330">
+    <defs>
+      <marker id="fl6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    </defs>
+    <!-- 1 -->
+    <rect x="10" y="20" width="290" height="230" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="50" y="55" width="210" height="110" rx="6" fill="#14532d"/>
+    <text x="155" y="105" text-anchor="middle" font-size="22" style="fill:#fff">Café 1,20 €</text>
+    <rect x="215" y="62" width="40" height="24" rx="4" fill="#fde68a"/><text x="235" y="80" text-anchor="middle" font-size="15" font-weight="700">v7</text>
+    <text x="155" y="200" text-anchor="middle" font-size="17" font-weight="700">1. Apunto la versión</text>
+    <text x="155" y="225" text-anchor="middle" font-size="15" style="fill:#64748b">«es la v7»</text>
+    <line x1="305" y1="135" x2="345" y2="135" stroke="#475569" stroke-width="3" marker-end="url(#fl6)"/>
+    <!-- 2 -->
+    <rect x="355" y="20" width="290" height="230" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="395" y="55" width="210" height="110" rx="6" fill="#14532d"/>
+    <text x="500" y="105" text-anchor="middle" font-size="22" style="fill:#fff">Café 1,20 €</text>
+    <text x="500" y="150" text-anchor="middle" font-size="30">📷</text>
+    <text x="500" y="200" text-anchor="middle" font-size="17" font-weight="700">2. Hago una foto</text>
+    <text x="500" y="225" text-anchor="middle" font-size="15" style="fill:#64748b">sin pedir permiso a nadie</text>
+    <line x1="650" y1="135" x2="690" y2="135" stroke="#475569" stroke-width="3" marker-end="url(#fl6)"/>
+    <!-- 3 -->
+    <rect x="700" y="20" width="290" height="230" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <text x="845" y="52" text-anchor="middle" font-size="17" font-weight="700">3. Vuelvo a mirar la versión</text>
+    <rect x="720" y="70" width="250" height="70" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="845" y="100" text-anchor="middle" font-size="17" font-weight="700" style="fill:#16a34a">Sigue en v7 ✅</text>
+    <text x="845" y="124" text-anchor="middle" font-size="14">Nadie la tocó: mi foto vale</text>
+    <rect x="720" y="155" width="250" height="80" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="845" y="185" text-anchor="middle" font-size="17" font-weight="700" style="fill:#dc2626">Ahora es v8 ❌</text>
+    <text x="845" y="207" text-anchor="middle" font-size="14">La cambiaron mientras tanto:</text>
+    <text x="845" y="226" text-anchor="middle" font-size="14">tiro la foto y repito CON permiso</text>
+    <text x="500" y="300" text-anchor="middle" font-size="17">Es <tspan font-weight="700">optimista</tspan> porque <tspan font-weight="700">apuesta</tspan> a que casi nunca hay escrituras: si acierta, leer sale casi gratis.</text>
+  </svg>
+  <div class="grid3" style="margin-top:2mm">
+    <div class="card verde"><b>No molesta a nadie</b><br>El que escribe <b>no tiene que esperar</b> a que yo acabe de mirar.</div>
+    <div class="card mal"><b>Por eso hay que comprobar</b><br>Mi foto puede haber salido <b>a medias</b> si cambiaron la pizarra durante la foto.</div>
+    <div class="card azul"><b>Compensa si…</b><br>…casi nadie escribe. Si escriben mucho, repito todo el rato y pierdo.</div>
+  </div>
+  <span class="num">6</span>
+</section>
+
+<!-- ================================================================ 7 -->
+<section class="page">
+  <span class="nivel bajo">NIVEL BAJO · StampedLock</span>
+  <h1>tryOptimisticRead() → copiar → validate(stamp)</h1>
+  <div class="grid2" style="grid-template-columns: 1.05fr 1fr; gap:6mm">
+    <svg viewBox="0 0 540 560">
+      <defs>
+        <marker id="fl7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+      </defs>
+      <g stroke="#475569" stroke-width="2.2" fill="none" marker-end="url(#fl7)">
+        <line x1="160" y1="50" x2="160" y2="78"/>
+        <line x1="160" y1="135" x2="160" y2="158"/>
+        <line x1="160" y1="208" x2="160" y2="233"/>
+        <line x1="160" y1="318" x2="160" y2="470"/>
+        <polyline points="282,275 410,275 410,323"/>
+        <line x1="410" y1="368" x2="410" y2="383"/>
+        <line x1="410" y1="423" x2="410" y2="438"/>
+        <polyline points="410,478 410,505 292,505"/>
+      </g>
+      <rect x="40" y="10" width="240" height="40" rx="20" fill="#e2e8f0"/>
+      <text x="160" y="36" text-anchor="middle" font-size="16" font-weight="700">Quiero leer</text>
+      <rect x="20" y="80" width="280" height="55" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+      <text x="160" y="104" text-anchor="middle" font-size="14" class="mono">stamp = sl.tryOptimisticRead()</text>
+      <text x="160" y="125" text-anchor="middle" font-size="12" style="fill:#059669">apunto la versión · NO cojo ningún lock</text>
+      <rect x="20" y="160" width="280" height="48" rx="8" fill="#fff" stroke="#475569" stroke-width="2"/>
+      <text x="160" y="181" text-anchor="middle" font-size="14">copio los campos a</text>
+      <text x="160" y="199" text-anchor="middle" font-size="14" font-weight="700">variables LOCALES</text>
+      <polygon points="160,235 282,275 160,315 38,275" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+      <text x="160" y="281" text-anchor="middle" font-size="14" class="mono" font-weight="700">validate(stamp)?</text>
+      <text x="170" y="370" font-size="14" font-weight="700" style="fill:#16a34a">true</text>
+      <text x="170" y="390" font-size="12" style="fill:#16a34a">nadie escribió</text>
+      <text x="300" y="265" font-size="14" font-weight="700" style="fill:#dc2626">false</text>
+      <text x="300" y="295" font-size="12" style="fill:#dc2626">alguien escribió</text>
+      <rect x="310" y="325" width="200" height="43" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <text x="410" y="352" text-anchor="middle" font-size="13" class="mono">stamp = sl.readLock()</text>
+      <rect x="310" y="385" width="200" height="38" rx="8" fill="#fff" stroke="#475569" stroke-width="2"/>
+      <text x="410" y="409" text-anchor="middle" font-size="13">copio otra vez</text>
+      <rect x="310" y="440" width="200" height="38" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <text x="410" y="464" text-anchor="middle" font-size="13" class="mono">sl.unlockRead(stamp)</text>
+      <text x="520" y="318" text-anchor="end" font-size="11" style="fill:#64748b">plan B (pesimista)</text>
+      <rect x="30" y="472" width="260" height="58" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2.5"/>
+      <text x="160" y="498" text-anchor="middle" font-size="16" font-weight="700">✅ USO los datos</text>
+      <text x="160" y="518" text-anchor="middle" font-size="12">(solo DESPUÉS de validar)</text>
+    </svg>
+    <div>
+      <h3>Línea de tiempo: el escritor NO espera al lector optimista</h3>
+      <svg viewBox="0 0 520 250">
+        <defs>
+          <marker id="fl7b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+        </defs>
+        <g font-size="12" font-weight="700"><text x="0" y="45">Lector</text><text x="0" y="60" style="fill:#059669">optimista</text>
+          <text x="0" y="125" style="fill:#ea580c">Escritor</text><text x="0" y="198">Versión</text></g>
+        <rect x="80" y="35" width="330" height="26" fill="#d1fae5" stroke="#059669"/>
+        <text x="245" y="53" text-anchor="middle" font-size="12">copiando los datos…</text>
+        <text x="80" y="27" font-size="11" class="mono">tryOptimisticRead() → 256</text>
+        <polygon points="440,30 465,48 440,66 415,48" fill="#fee2e2" stroke="#dc2626"/>
+        <text x="440" y="85" text-anchor="middle" font-size="11" class="mono" style="fill:#dc2626">validate(256)</text>
+        <text x="440" y="100" text-anchor="middle" font-size="12" font-weight="700" style="fill:#dc2626">false ❌</text>
+        <rect x="200" y="110" width="110" height="26" fill="#ea580c"/>
+        <text x="255" y="128" text-anchor="middle" font-size="12" style="fill:#fff">writeLock · escribe</text>
+        <text x="255" y="155" text-anchor="middle" font-size="11" style="fill:#ea580c">entra al momento, sin esperar</text>
+        <rect x="80" y="182" width="120" height="26" fill="#f1f5f9" stroke="#94a3b8"/><text x="140" y="200" text-anchor="middle" font-size="12" class="mono">256</text>
+        <rect x="200" y="182" width="110" height="26" fill="#ffedd5" stroke="#ea580c"/><text x="255" y="200" text-anchor="middle" font-size="12">cambia</text>
+        <rect x="310" y="182" width="200" height="26" fill="#f1f5f9" stroke="#94a3b8"/><text x="410" y="200" text-anchor="middle" font-size="12" class="mono">otra versión</text>
+        <line x1="80" y1="232" x2="515" y2="232" stroke="#475569" marker-end="url(#fl7b)"/>
+        <text x="515" y="248" text-anchor="end" font-size="11" style="fill:#64748b">tiempo</text>
+      </svg>
+      <div class="card" style="margin-top:3mm; font-size:10.5pt">
+        <b>Demo L04 (salida real):</b> de 200 lecturas optimistas, <b>40</b> fallaron <span class="mono">validate</span>;
+        <b>32</b> de ellas eran copias a medias. Datos incoherentes usados: <b style="color:#16a34a">0</b>.
+      </div>
+      <div class="card mal" style="margin-top:3mm; font-size:10.5pt">
+        <b>Limitaciones:</b> hay que validar siempre · no usar los datos antes de validar · solo para leer ·
+        con muchas escrituras falla mucho · <b>StampedLock no es reentrante</b>.
+      </div>
+      <div class="card verde" style="margin-top:3mm; font-size:10.5pt">
+        <span class="mono">tryConvertToWriteLock(stamp)</span>: intenta pasar a escritura sin soltar. Devuelve el nuevo stamp o <b>0</b> si no puede.
+      </div>
+    </div>
+  </div>
+  <span class="num">7</span>
+</section>
+
+<!-- ================================================================ 8 -->
+<section class="page">
+  <span class="nivel bajo">NIVEL BAJO · COMPARATIVA</span>
+  <h1>ReentrantLock vs ReentrantReadWriteLock vs StampedLock</h1>
+  <h2>Un pase único · dos tipos de pase · dos tipos de pase + mirar sin pase</h2>
+  <table style="font-size:12pt">
+    <tr><th class="izq"></th><th>ReentrantLock</th><th>ReentrantReadWriteLock</th><th>StampedLock</th></tr>
+    <tr><th class="izq">Lectores a la vez</th><td class="no">❌</td><td class="si">✅</td><td class="si">✅</td></tr>
+    <tr><th class="izq">Leer sin bloquear (optimista)</th><td class="no">❌</td><td class="no">❌</td><td class="si">✅ tryOptimisticRead</td></tr>
+    <tr><th class="izq">¿Reentrante?</th><td class="si">✅</td><td class="si">✅</td><td class="no">❌</td></tr>
+    <tr><th class="izq">Fairness (orden de llegada)</th><td class="si">✅ opcional</td><td class="si">✅ opcional</td><td class="no">❌</td></tr>
+    <tr><th class="izq">Condition (await / signal)</th><td class="si">✅</td><td>solo writeLock</td><td class="no">❌</td></tr>
+    <tr><th class="izq">Subir de lectura a escritura</th><td>—</td><td class="no">❌ bloqueo</td><td class="si">✅ tryConvertToWriteLock</td></tr>
+    <tr><th class="izq">Cómo se suelta</th><td class="mono">unlock()</td><td class="mono">unlock()</td><td class="mono">unlockRead/Write(stamp)</td></tr>
+    <tr><th class="izq">Dificultad</th><td>fácil</td><td>media</td><td style="color:#dc2626;font-weight:700">alta</td></tr>
+    <tr><th class="izq">Ideal para</th><td>uso general</td><td>muchas lecturas lentas, pocas escrituras</td><td>muchísimas lecturas, escrituras raras, máximo rendimiento</td></tr>
+  </table>
+  <div class="grid3" style="margin-top:5mm">
+    <div class="card"><b>Reentrante</b> = el mismo hilo puede volver a coger el lock que ya tiene (y lo suelta las mismas veces).</div>
+    <div class="card"><b>Stamp</b> = un <span class="mono">long</span> que funciona como ticket. <span class="mono">0</span> = no conseguido.</div>
+    <div class="card"><b>Los tres</b> necesitan <span class="mono">unlock</span> en <span class="mono">finally</span>: no se liberan solos.</div>
+  </div>
+  <span class="num">8</span>
+</section>
+
+<!-- ================================================================ 9 -->
+<section class="page">
+  <span class="nivel bajo">DEMO · L05_Comparativa (salida real)</span>
+  <h1>Las 4 formas con el mismo trabajo</h1>
+  <div class="grid2">
+    <div>
+      <h3>Escenario A: 4 lectores × 50 lecturas de 10 ms · 1 escritor</h3>
+      <div class="barra"><span>Sin sincronizar</span><div class="b" style="width:22.7%;background:#dc2626">548</div><span style="color:#dc2626"><b>16</b> incoherentes ❌</span></div>
+      <div class="barra"><span>synchronized</span><div class="b" style="width:100%;background:#64748b">2414 ms</div><span>0 ✅ · lento</span></div>
+      <div class="barra"><span>ReentrantReadWriteLock</span><div class="b" style="width:23.5%;background:#2563eb">567</div><span>0 ✅ · rápido</span></div>
+      <div class="barra"><span>StampedLock optimista</span><div class="b" style="width:24.9%;background:#059669">600</div><span>0 ✅ · 20 reintentos</span></div>
+      <div class="card ok" style="margin-top:4mm">Lecturas que tardan algo y casi sin escrituras: los locks de lectura van <b>~4 veces más rápido</b> que synchronized y siguen siendo correctos.</div>
+    </div>
+    <div>
+      <h3>Escenario B: 8 lectores con lecturas INSTANTÁNEAS · 1 escritor</h3>
+      <div class="barra"><span>Sin sincronizar</span><div class="b" style="width:1%;background:#dc2626">9</div><span style="color:#dc2626"><b>15 701</b> incoherentes ❌</span></div>
+      <div class="barra"><span>synchronized</span><div class="b" style="width:67.8%;background:#64748b">582 ms</div><span>0 ✅</span></div>
+      <div class="barra"><span>ReentrantReadWriteLock</span><div class="b" style="width:100%;background:#2563eb">858 ms</div><span style="color:#dc2626"><b>¡más lento!</b></span></div>
+      <div class="barra"><span>StampedLock optimista</span><div class="b" style="width:1.9%;background:#059669">16</div><span>0 ✅</span></div>
+      <div class="card mal" style="margin-top:4mm">Si leer es instantáneo, RW <b>empeora</b>: cada <span class="mono">readLock().lock()</span> modifica un contador compartido de lectores y los 8 hilos se pelean por él.</div>
+    </div>
+  </div>
+  <div class="frase">«Rápido y mal no sirve. Primero correcto; y dentro de lo correcto, el más rápido <b>para mi caso</b>.» · Los tiempos cambian en cada ejecución: fíjate en la proporción.</div>
+  <span class="num">9</span>
+</section>
+
+<!-- ================================================================ 10 -->
+<section class="page">
+  <span class="nivel alto">CONCLUSIONES · CASOS DE USO</span>
+  <h1>¿Cuál elijo?</h1>
+  <svg viewBox="0 0 1000 370">
+    <defs>
+      <marker id="fl10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    </defs>
+    <g stroke="#475569" stroke-width="2" fill="none" marker-end="url(#fl10)">
+      <polyline points="310,40 180,40 180,108"/>
+      <polyline points="690,40 650,40 650,108"/>
+      <polyline points="530,130 400,130 400,208"/>
+      <polyline points="770,130 760,130 760,208"/>
+      <polyline points="630,230 600,230 600,308"/>
+      <polyline points="890,230 880,230 880,308"/>
+    </g>
+    <rect x="310" y="15" width="380" height="50" rx="10" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+    <text x="500" y="46" text-anchor="middle" font-size="16" font-weight="700">¿Se lee MUCHO más de lo que se escribe?</text>
+    <text x="230" y="33" font-size="13" font-weight="700" style="fill:#dc2626">No</text>
+    <text x="700" y="33" font-size="13" font-weight="700" style="fill:#16a34a">Sí</text>
+    <rect x="50" y="110" width="260" height="44" rx="10" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+    <text x="180" y="138" text-anchor="middle" font-size="15" font-weight="700">synchronized / ReentrantLock</text>
+    <rect x="530" y="110" width="240" height="44" rx="10" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+    <text x="650" y="138" text-anchor="middle" font-size="15" font-weight="700">¿Leer tarda algo?</text>
+    <text x="410" y="152" font-size="13" font-weight="700" style="fill:#dc2626">No (un simple int)</text>
+    <text x="775" y="122" font-size="13" font-weight="700" style="fill:#16a34a">Sí</text>
+    <rect x="270" y="210" width="260" height="44" rx="10" fill="#e2e8f0" stroke="#475569" stroke-width="2"/>
+    <text x="400" y="238" text-anchor="middle" font-size="15" font-weight="700">synchronized · Atomic · volatile</text>
+    <rect x="630" y="210" width="260" height="44" rx="10" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+    <text x="760" y="230" text-anchor="middle" font-size="14" font-weight="700">¿Necesitas reentrancia,</text>
+    <text x="760" y="247" text-anchor="middle" font-size="14" font-weight="700">Condition o fairness?</text>
+    <text x="560" y="280" font-size="13" font-weight="700" style="fill:#16a34a">Sí</text>
+    <text x="895" y="280" font-size="13" font-weight="700" style="fill:#dc2626">No</text>
+    <rect x="480" y="310" width="240" height="46" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2.5"/>
+    <text x="600" y="339" text-anchor="middle" font-size="15" font-weight="700" style="fill:#2563eb">ReentrantReadWriteLock</text>
+    <rect x="760" y="310" width="235" height="46" rx="10" fill="#d1fae5" stroke="#059669" stroke-width="2.5"/>
+    <text x="877" y="331" text-anchor="middle" font-size="14" font-weight="700" style="fill:#059669">StampedLock (optimista)</text>
+    <text x="877" y="348" text-anchor="middle" font-size="11" style="fill:#059669">si buscas máximo rendimiento</text>
+    <text x="40" y="250" font-size="14" style="fill:#64748b">Casos de uso típicos:</text>
+    <text x="40" y="272" font-size="14" style="fill:#64748b">cachés, configuración,</text>
+    <text x="40" y="294" font-size="14" style="fill:#64748b">catálogos de activos,</text>
+    <text x="40" y="316" font-size="14" style="fill:#64748b">fichas de vulnerabilidad…</text>
+  </svg>
+  <div class="grid2">
+    <div class="card mal"><b>Cuándo NO compensa</b>
+      <ul style="font-size:11pt">
+        <li>Secciones críticas cortísimas (leer un <span class="mono">int</span>)</li>
+        <li>Casi tantas escrituras como lecturas</li>
+        <li>Pocos hilos o poca competencia</li>
+        <li>Ya existe <span class="mono">ConcurrentHashMap</span>, <span class="mono">CopyOnWriteArrayList</span>…</li>
+        <li>Datos inmutables: no hay nada que proteger</li>
+      </ul>
+    </div>
+    <div>
+<pre><span class="c">// Regla de oro: liberar SIEMPRE</span>
+lock.lock();          <span class="c">// fuera del try</span>
+<span class="k">try</span> {
+    ...
+} <span class="k">finally</span> {
+    lock.unlock();    <span class="c">// aunque haya excepción</span>
+}
+<span class="c">// Si no: el lock queda cogido para siempre
+// y el programa se congela SIN ningún error.</span></pre>
+    </div>
+  </div>
+  <span class="num">10</span>
+</section>
+
+</body>
+</html>

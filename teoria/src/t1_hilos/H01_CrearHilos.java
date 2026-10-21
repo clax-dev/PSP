@@ -18,7 +18,7 @@ package t1_hilos;
  *  TRES FORMAS DE CREAR UN HILO:
  *    1. implements Runnable   (RECOMENDADA — la de Cafeteria)
  *    2. extends Thread        (peor: Java solo permite heredar de UNA clase)
- *    3. lambda                (Runnable es una interfaz funcional -> une tema 1 y tema 3)
+ *    3. lambda                (Runnable es una interfaz funcional: se puede escribir como lambda)
  *
  *  CICLO DE VIDA:
  *     NEW --start()--> RUNNABLE <--> BLOCKED / WAITING / TIMED_WAITING --fin run()--> TERMINATED
